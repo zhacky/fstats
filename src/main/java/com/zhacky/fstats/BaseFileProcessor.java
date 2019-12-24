@@ -3,10 +3,8 @@ package com.zhacky.fstats;
 import com.zhacky.fstats.messages.Messages;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -20,15 +18,13 @@ import java.util.logging.Logger;
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
 import static java.nio.file.StandardWatchEventKinds.*;
 import static java.util.logging.Level.INFO;
-import static java.util.logging.Level.FINE;
 
 public abstract class BaseFileProcessor implements FileProcessor {
     static Logger logger;
     private File sourceDir;
     private File processedDir;
-    private List<File> files;
+    List<File> files;
     private boolean listening;
-    private String stats;
 
 
     @Override
@@ -38,6 +34,8 @@ public abstract class BaseFileProcessor implements FileProcessor {
             logger.setLevel(INFO);
         }
         listening = false;
+        files = new ArrayList<>();
+
         String message = "";
         if (args.length == 0) {
             message = Messages.INTRO;
@@ -52,23 +50,28 @@ public abstract class BaseFileProcessor implements FileProcessor {
             } else {
                 int sourceIndex = params.indexOf("-s") + 1;
                 try {
-                    String src = params.get(sourceIndex);
-                    if (isDirectory(src)) {
-                        sourceDir = new File(src);
-                        logger.log(Level.INFO, "Source Directory = " + src + "\n");
-                        // TODO: listen for changes
-                        watchDirectory(sourceDir.toPath(), files);
-                        //TODO: Add process
-
-                    }
-
                     int processedIndex = params.indexOf("-p") + 1;
                     String prc = params.get(processedIndex);
                     if (isDirectory(prc)) {
                         processedDir = new File(prc);
                         // TODO: Add process
                         logger.log(Level.INFO, "Processed Directory = " + prc + "\n");
+                    } else {
+                        return "[-p] directory is invalid or does not exist";
                     }
+
+                    String src = params.get(sourceIndex);
+                    if (isDirectory(src)) {
+                        sourceDir = new File(src);
+                        logger.log(Level.INFO, "Source Directory = " + src + "\n");
+
+                        // TODO: listen for changes
+                        watchDirectory(sourceDir.toPath(), files);
+
+
+                    }
+
+
                 } catch (ArrayIndexOutOfBoundsException e) {
                     message = "Paths cannot be empty";
                     return message;
@@ -102,14 +105,19 @@ public abstract class BaseFileProcessor implements FileProcessor {
         listening = true;
         FileSystem fs = path.getFileSystem();
 
+        if (sourceDir.listFiles() != null && sourceDir.listFiles().length > 0) {
+            // initially process files
+            files = Arrays.asList(sourceDir.listFiles());
+            processFiles(files, processedDir.toPath());
+        }
         try {
             WatchService service = fs.newWatchService();
             path.register(service, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE);
-            WatchKey key = null;
+            WatchKey key;
             while (listening) {
                 key = service.take();
 
-                WatchEvent.Kind<?> kind = null;
+                WatchEvent.Kind<?> kind;
 
                 for (WatchEvent<?> watchEvent : key.pollEvents()) {
                     kind = watchEvent.kind();
@@ -118,10 +126,22 @@ public abstract class BaseFileProcessor implements FileProcessor {
                     } else if (ENTRY_CREATE == kind) {
                         // new filepath created
                         Path newPath = (Path) watchEvent.context();
-                         logger.log(INFO, "New path created: " + newPath);
+                        logger.log(INFO, "New path created: " + newPath);
+
+                        // get files from this directory
+                        files = Arrays.asList(sourceDir.listFiles());
+                        if (files != null && !files.isEmpty()) {
+                            // if there is a change, process the file right away
+                            processFiles(files, processedDir.toPath());
+                        }
                     } else if (ENTRY_MODIFY == kind) {
                         // a file has been modified
                         Path modPath = (Path) watchEvent.context();
+                        //TODO: Add process
+                        if (files != null && !files.isEmpty()) {
+                            // if there is a change, process the file right away
+                            processFiles(files, processedDir.toPath());
+                        }
                         logger.log(INFO, "Path has been modified: " + modPath);
                     } else if (ENTRY_DELETE == kind) {
                         // a file has been deleted
@@ -130,6 +150,7 @@ public abstract class BaseFileProcessor implements FileProcessor {
                     }
 
                     if (!key.reset()) {
+
                         break; // check again
                     }
 
@@ -143,57 +164,52 @@ public abstract class BaseFileProcessor implements FileProcessor {
         }
 
 
-        files = Arrays.asList(sourceDir.listFiles());
     }
 
     @Override
     public void processFiles(List<File> files, Path destination) {
-
         for (File file :
                 files) {
-            // create file lock
-            createFileLock(destination, file);
-
+            processFile(file, destination);
         }
     }
 
-    private void createFileLock(Path destination, File file) {
-        RandomAccessFile randomAccessFile = null;
-
-        try {
-            randomAccessFile = new RandomAccessFile(file.getName(),"rw");
+    private void lockFile(File file) {
+        try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw")) {
             FileChannel fc = randomAccessFile.getChannel();
-            ByteBuffer buffer = null;
-            FileLock fileLock = fc.tryLock();
-            if (fileLock != null) {
-
-                processFile(file, destination);
+            FileLock lock = fc.lock();
+            try {
+                lock = fc.tryLock();
+                if (lock != null) {
+                    //Important: this is where file gets actually processed
+                    System.out.println("processing " + file.getName());
+                    while (randomAccessFile.read() == -1) {
+                        System.out.println(randomAccessFile.readLine());
+                    }
+                }
+            } catch (OverlappingFileLockException ignored) {
             }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (OverlappingFileLockException | IOException e) {
+            assert lock != null;
+            lock.release();
+            fc.close();
+
+        } catch (IOException e) {
             e.printStackTrace();
         }
+
+
     }
 
     @Override
     public void processFile(File file, Path destination) {
-
+        logger.log(INFO, "Processing file...\n" + file.getName());
+        try {
+            printStats(file);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
-    public File getSourceDir() {
-        return sourceDir;
-    }
+    protected abstract void printStats(File file) throws Exception;
 
-    public void setSourceDir(File sourceDir) {
-        this.sourceDir = sourceDir;
-    }
-
-    public File getProcessedDir() {
-        return processedDir;
-    }
-
-    public void setProcessedDir(File processedDir) {
-        this.processedDir = processedDir;
-    }
 }

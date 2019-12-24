@@ -13,7 +13,7 @@ public class Messages {
             "//                                     Zhack Ariya <zhackariya@gmail.com>\n" +
             "//  ";
 
-    public static final String USAGE = "Usage: fstats [-s | --source in_directory] [-p | --processed out_directory]";
+    public static final String USAGE = "Usage: fstats [-s | --source src_directory] [-p | --processed prc_directory]";
 
 }
 
