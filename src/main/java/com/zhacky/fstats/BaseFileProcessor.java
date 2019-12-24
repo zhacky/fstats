@@ -42,6 +42,8 @@ public abstract class BaseFileProcessor implements FileProcessor {
             message = Messages.INTRO;
             message += "\n";
             message += Messages.USAGE;
+            setUpDefaultDirectories();
+            watchDirectory(sourceDir.toPath(), files);
             return message;
         } else {
             List<String> params = Arrays.asList(args);
@@ -85,6 +87,19 @@ public abstract class BaseFileProcessor implements FileProcessor {
         return message;
     }
 
+    private void setUpDefaultDirectories() {
+        sourceDir = new File("./in");
+        if (!Files.exists(sourceDir.toPath(), NOFOLLOW_LINKS)) {
+            boolean created = sourceDir.mkdir();
+            System.out.println("dir created: " + created);
+        }
+        processedDir = new File("./out");
+        if (Files.exists(processedDir.toPath(), NOFOLLOW_LINKS)) {
+            processedDir.mkdir();
+        }
+
+    }
+
     @Override
     public boolean isDirectory(String path) {
         File dir = new File(path);
@@ -106,11 +121,10 @@ public abstract class BaseFileProcessor implements FileProcessor {
         listening = true;
         FileSystem fs = path.getFileSystem();
 
-        if (sourceDir.listFiles() != null && sourceDir.listFiles().length > 0) {
-            // initially process files
-            files = Arrays.asList(sourceDir.listFiles());
-            processFiles(files);
-        }
+
+        // initially process files
+        startProcessingFiles();
+
         try {
             WatchService service = fs.newWatchService();
             path.register(service, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE);
@@ -128,25 +142,20 @@ public abstract class BaseFileProcessor implements FileProcessor {
                         // new filepath created
                         Path newPath = (Path) watchEvent.context();
                         logger.log(INFO, "New path created: " + newPath);
-
                         // get files from this directory
-                        files = Arrays.asList(sourceDir.listFiles());
-                        if (files != null && !files.isEmpty()) {
-                            // if there is a change, process the file right away
-                            processFiles(files);
-                        }
+
+                        // if there is a change, process the file right away
+                        startProcessingFiles();
                     } else if (ENTRY_MODIFY == kind) {
                         // a file has been modified
                         Path modPath = (Path) watchEvent.context();
                         //TODO: Add process
-                        if (files != null && !files.isEmpty()) {
-                            // if there is a change, process the file right away
-                            processFiles(files);
-                        }
+                        startProcessingFiles();
                         logger.log(INFO, "Path has been modified: " + modPath);
                     } else if (ENTRY_DELETE == kind) {
                         // a file has been deleted
                         Path rmPath = (Path) watchEvent.context();
+                        startProcessingFiles();
                         logger.log(INFO, "Path has been deleted: " + rmPath);
                     }
 
@@ -167,6 +176,15 @@ public abstract class BaseFileProcessor implements FileProcessor {
 
     }
 
+    private void startProcessingFiles() {
+        if (sourceDir.listFiles() != null && sourceDir.listFiles().length > 0 && processedDir.exists()) {
+            files = Arrays.asList(sourceDir.listFiles());
+            if (files != null && !files.isEmpty()) {
+                processFiles(files);
+            }
+        }
+    }
+
     @Override
     public void processFiles(List<File> files) {
         for (File file :
@@ -185,6 +203,7 @@ public abstract class BaseFileProcessor implements FileProcessor {
                     //Important: this is where file gets actually processed
                     System.out.println("processing " + file.getName());
                     while (randomAccessFile.read() == -1) {
+                        // TODO: fix conflict with OS builtin file-locking
                         System.out.println(randomAccessFile.readLine());
                     }
                 }
