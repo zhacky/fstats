@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.OFF;
 
 public class TextFileProcessor extends BaseFileProcessor {
 
@@ -17,7 +18,7 @@ public class TextFileProcessor extends BaseFileProcessor {
     public String initialize(String[] args) {
         files = new ArrayList<>();
         logger = Logger.getLogger(TextFileProcessor.class.getName());
-        logger.setLevel(INFO);
+        logger.setLevel(INFO); // set to INFO for verbose logging
         String res = super.initialize(args);
 
         return res;
@@ -26,6 +27,18 @@ public class TextFileProcessor extends BaseFileProcessor {
     @Override
     protected void printStats(File file) throws Exception {
         List<String> contents = Files.readAllLines(file.toPath());
-        System.out.println(contents.toString());
+        Stats stats = new Stats(contents);
+        System.out.println("---------------------");
+        System.out.println("File Name:\t\tType:");
+        System.out.println("\"" + file.getName().substring(0,file.getName().indexOf(".")) + "\"\t\t" + file.getName().substring(file.getName().indexOf(".")));
+        System.out.println("Number Of Lines: ");
+        System.out.println(stats.getNumberOfLines());
+        System.out.println("Number Of Words:");
+        System.out.println(stats.getNumberOfWords());
+        System.out.println("Number Of Dots:");
+        System.out.println(stats.getNumberOfDots());
+        System.out.println("---------------------");
+
+
     }
 }

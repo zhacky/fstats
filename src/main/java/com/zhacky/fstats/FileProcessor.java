@@ -12,7 +12,9 @@ public interface FileProcessor {
 
     void watchDirectory(Path path, List<File> files);
 
-    void processFiles(List<File> files, Path destination);
+    void processFiles(List<File> files);
 
-    void processFile(File file, Path destination);
+    void processFile(File file);
+
+    void moveToProcessedFolder(File file, String destination);
 }

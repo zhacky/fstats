@@ -16,6 +16,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.nio.file.StandardWatchEventKinds.*;
 import static java.util.logging.Level.INFO;
 
@@ -108,7 +109,7 @@ public abstract class BaseFileProcessor implements FileProcessor {
         if (sourceDir.listFiles() != null && sourceDir.listFiles().length > 0) {
             // initially process files
             files = Arrays.asList(sourceDir.listFiles());
-            processFiles(files, processedDir.toPath());
+            processFiles(files);
         }
         try {
             WatchService service = fs.newWatchService();
@@ -132,7 +133,7 @@ public abstract class BaseFileProcessor implements FileProcessor {
                         files = Arrays.asList(sourceDir.listFiles());
                         if (files != null && !files.isEmpty()) {
                             // if there is a change, process the file right away
-                            processFiles(files, processedDir.toPath());
+                            processFiles(files);
                         }
                     } else if (ENTRY_MODIFY == kind) {
                         // a file has been modified
@@ -140,7 +141,7 @@ public abstract class BaseFileProcessor implements FileProcessor {
                         //TODO: Add process
                         if (files != null && !files.isEmpty()) {
                             // if there is a change, process the file right away
-                            processFiles(files, processedDir.toPath());
+                            processFiles(files);
                         }
                         logger.log(INFO, "Path has been modified: " + modPath);
                     } else if (ENTRY_DELETE == kind) {
@@ -167,10 +168,10 @@ public abstract class BaseFileProcessor implements FileProcessor {
     }
 
     @Override
-    public void processFiles(List<File> files, Path destination) {
+    public void processFiles(List<File> files) {
         for (File file :
                 files) {
-            processFile(file, destination);
+            processFile(file);
         }
     }
 
@@ -201,13 +202,32 @@ public abstract class BaseFileProcessor implements FileProcessor {
     }
 
     @Override
-    public void processFile(File file, Path destination) {
+    public void processFile(File file) {
         logger.log(INFO, "Processing file...\n" + file.getName());
         try {
             printStats(file);
+            String destination = processedDir.getAbsolutePath();
+            moveToProcessedFolder(file, destination);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void moveToProcessedFolder(File file, String destination) {
+        Path destFile = Paths.get(destination + "/" + file.getName()); //.replace(" ", "\\ ")
+        logger.log(INFO, "Destination Path: " +
+                "" + destFile.toString());
+        try {
+            Path temp = Files.move(Paths.get(String.valueOf(file.getAbsoluteFile())), destFile, REPLACE_EXISTING);
+            logger.log(INFO, "File has been moved here: " + temp);
+            if (temp != null) {
+                logger.log(INFO, "File moved successfully");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     protected abstract void printStats(File file) throws Exception;

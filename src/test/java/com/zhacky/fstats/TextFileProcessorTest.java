@@ -1,9 +1,13 @@
 package com.zhacky.fstats;
 
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.junit.Assert.*;
 
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.File;
+import java.nio.file.Path;
 
 public class TextFileProcessorTest {
     TextFileProcessor processor;
@@ -45,5 +49,17 @@ public class TextFileProcessorTest {
         boolean result = processor.isDirectory(path);
         // then
         // should throw IllegalArgumentException
+    }
+
+    @Test
+    public void test_moveToProcessedFolder_should_move_file() {
+        // given
+        File file = new File("/data/Laboratory/Java/FileStatisticsApp/fstats/src/main/resources/demo_source/file1.txt");
+        String destination = "/data/Laboratory/Java/FileStatisticsApp/fstats/src/main/resources/demo_processed/file1.txt";
+        // then
+        processor.moveToProcessedFolder(file, destination);
+        File destFile = new File(destination);
+        assertNotNull(destFile);
+
     }
 }
