@@ -1,16 +1,11 @@
 package com.zhacky.fstats;
 
-import java.io.File;
 import java.io.Serializable;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.StringTokenizer;
 
 public class Stats implements Serializable {
     final List<String> dataString;
-    int numberOfLines;
-    int numberOfDots;
-    int numberOfWords;
 
     public Stats(List<String> dataString) {
         this.dataString = dataString;

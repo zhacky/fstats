@@ -18,7 +18,7 @@ public class TextFileProcessor extends BaseFileProcessor {
     public String initialize(String[] args) {
         files = new ArrayList<>();
         logger = Logger.getLogger(TextFileProcessor.class.getName());
-        logger.setLevel(OFF); // set to INFO for verbose logging
+        logger.setLevel(INFO); // set to INFO for verbose logging
         String res = super.initialize(args);
 
         return res;
